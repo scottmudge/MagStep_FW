@@ -1,9 +1,8 @@
 #include <Arduino.h>
-#include <ESPArduinoPins.h>
 #include <ESP8266WiFi.h>
-#include <float.h>
-
+#include <ESPArduinoPins.h>
 #include <MovingAverage.h>
+#include <float.h>
 MovingAverage<float> g_AngFlt(3);
 
 #include <AS5600.h>
@@ -24,13 +23,12 @@ bool is_equal(const float& left, const float& right, const float& epsilon /*= 0.
     return diff / std::min<float>(float(fabsf(left) + fabsf(right)), FLT_MAX) < epsilon;
 }
 
-
 void setup() {
     Serial.begin(115200);
     // put your setup code here, to run once:
     WiFi.mode(WIFI_OFF);
     WiFi.forceSleepBegin();
-    }
+}
 
 void loop() {
     int mag_str = g_Magnet.getMagnetStrength();
@@ -46,9 +44,9 @@ void loop() {
     const uint32_t elapsed = new_mils - g_Millis;
     const uint32_t output_ms = 10;
 
-    if (elapsed > output_ms){
+    if (elapsed > output_ms) {
         g_Millis = new_mils;
-        if (mag_str > 0){
+        if (mag_str > 0) {
             const float new_ang = g_AngFlt.get();
             if (!is_equal(new_ang, g_Buf, 0.001)) {
                 g_Buf = new_ang;
@@ -57,7 +55,7 @@ void loop() {
         }
         g_Samp = 0;
     }
-    
+
     // if (mag_str > 0){
     //     sprintf(buf, "%s - %u\n", mag_str == 1 ? "Weak" : mag_str == 2 ? "Good" : "Far", ang);
     //     Serial.printf(buf);
