@@ -1,6 +1,6 @@
 /****************************************************
-  AS5600 class for Arduino platform
-  Author: Scott Mudge, based on code from Tom Denton
+  AS5600 class for Arduino platform, with configuration modes
+  Author: Scott Mudge
   Date: 09 Jan 2022
   File: AS5600.cpp 
   Version 1.00
@@ -228,19 +228,73 @@ uint16_t AS5600::getEndPosition() {
     return retVal;
 }
 
+/* Updates the raw angle */
+//==============================================================================
+AS5600_Error_t AS5600::updateRawAngle() {
+    _curRawAngle = readTwoBytes(AS5600_Reg_RawAng_Hi, AS5600_Reg_RawAng_Lo);
+    if (_curRawAngle > AS5600_Max_Raw_Val) return AS5600_Error_InvalidDistance;
+    return AS5600_OK;
+}
+
+/* Updates the scaled angle */
+//==============================================================================
+AS5600_Error_t AS5600::updateScaledAngle() {
+    _curScaledAngle = readTwoBytes(AS5600_Reg_Angle_Hi, AS5600_Reg_Angle_Lo);
+    if (_curScaledAngle > AS5600_Max_Raw_Val) return AS5600_Error_InvalidDistance;
+    return AS5600_OK;
+}
+
 /* Gets raw value of magnet position.
   start, end, and max angle settings do not apply */
 //==============================================================================
-uint16_t AS5600::getRawAngle() {
-    return readTwoBytes(AS5600_Reg_RawAng_Hi, AS5600_Reg_RawAng_Lo);
+uint16_t AS5600::getRawAngle(const bool update) {
+    if (update) updateRawAngle();
+    return _curRawAngle;
+}
+
+// Get raw angle, and normalize it for entire range
+//==============================================================================
+float AS5600::getRawAngleNormalized(const bool update){
+    return float(getRawAngle(update)) / (float)AS5600_Val_Range;    
+}
+
+// Get raw angle in degrees (0 - 360.0)
+//==============================================================================
+float AS5600::getRawAngleDegs(const bool update) {
+    return getRawAngleNormalized(update) * 360.0f;
+}
+
+// Get raw angle in radians
+//==============================================================================
+float AS5600::getRawAngleRads(const bool update) {
+    return getRawAngleNormalized(update) * 6.28318530718f;
 }
 
 /* Gets scaled value of magnet position.
   start, end, or max angle settings are used to 
   determine value */
 //==============================================================================
-uint16_t AS5600::getScaledAngle() {
-    return readTwoBytes(AS5600_Reg_Angle_Hi, AS5600_Reg_Angle_Lo);
+uint16_t AS5600::getScaledAngle(const bool update) {
+    if (update) updateScaledAngle();
+    return _curScaledAngle;
+}
+
+// Get raw angle, and normalize it for entire range
+//==============================================================================
+float AS5600::getScaledAngleNormalized(const bool update){
+    return float(getScaledAngle(update)) / (float)AS5600_Val_Range;    
+}
+
+// Get raw angle in degrees (0 - 360.0)
+//==============================================================================
+float AS5600::getScaledAngleDegs(const bool update) {
+    return getScaledAngleNormalized(update) * 360.0f;
+}
+
+// Get raw angle in radians
+//==============================================================================
+float AS5600::getScaledAngleRads(const bool update) {
+    return getScaledAngleNormalized(update) * 6.28318530718f;
 }
 
 /* Out: 1 if magnet is detected, 0 if not
@@ -386,9 +440,7 @@ uint16_t AS5600::readTwoBytes(int in_adr_hi, int in_adr_lo) {
     Wire.write(in_adr_hi);
     Wire.endTransmission();
     Wire.requestFrom(getAddress(), 2U);
-    while (Wire.available() < 2)
-        ;
-
+    while (Wire.available() < 2) ;
     int high = Wire.read();
     int low = Wire.read();
     return (high << 8) | low;

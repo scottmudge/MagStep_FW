@@ -1,5 +1,5 @@
 /****************************************************
-  AMS 5600 class for Arduino platform, with configuration modes
+  AS5600 class for Arduino platform, with configuration modes
   Author: Scott Mudge
   Date: 09 Jan 2022
   File: AS5600.h 
@@ -130,7 +130,11 @@ enum AS5600_Error_t {
 // Constants
 //==============================================================================
 // Address of the chip
-static constexpr uint8_t AS5600_I2C_Addr = 0x36;
+static constexpr uint8_t AS5600_I2C_Addr        = 0x36;
+// Doesn't get larger than 4095, 0-4095 == 2^12 range
+static constexpr uint16_t AS5600_Val_Range      = 4096U; 
+static constexpr uint16_t AS5600_Max_Raw_Val    = AS5600_Val_Range - 1U; 
+
 
 // Configuration Structure, used for storing and creating config register data
 //==============================================================================
@@ -183,8 +187,27 @@ public:
     uint16_t setEndPosition(uint16_t endAngle = -1);
     uint16_t getEndPosition();
 
-    uint16_t getRawAngle();
-    uint16_t getScaledAngle();
+    // Call this to update the angle from sensor. Or use one of the getters below and pass "true"
+    AS5600_Error_t updateRawAngle();
+    AS5600_Error_t updateScaledAngle();
+
+    // Get raw angle, right out of sensor
+    uint16_t getRawAngle(const bool update = false);
+    // Get raw angle, and normalize it for entire range
+    float getRawAngleNormalized(const bool update = false);
+    // Get raw angle in degrees (0 - 360.0)
+    float getRawAngleDegs(const bool update = false);
+    // Get raw angle in radians
+    float getRawAngleRads (const bool update = false);
+
+    // Get angle scaled to configuration
+    uint16_t getScaledAngle(const bool update = false);
+    // Get scaled angle, and normalize it for entire range
+    float getScaledAngleNormalized(const bool update = false);
+    // Get scaled angle in degrees (0 - 360.0)
+    float getScaledAngleDegs(const bool update = false);
+    // Get scaled angle in radians
+    float getScaledAngleRads(const bool update = false);
 
     int detectMagnet();
     int getMagnetStrength();
@@ -206,6 +229,10 @@ private:
     uint16_t _maxAngle;
 
     AS5600Config _config;
+
+    uint16_t 
+        _curRawAngle = 0U,
+        _curScaledAngle = 0U;
 
     void init();
     int readOneByte(int in_adr);
