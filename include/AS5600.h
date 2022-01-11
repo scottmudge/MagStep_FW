@@ -162,7 +162,7 @@ public:
     AS5600(TwoWire *wire = nullptr);
     AS5600(const uint8_t sda, const uint8_t scl);
 
-    constexpr uint8_t getAddress();
+    static constexpr uint8_t getAddress();
 
     // Returns mutable config, be sure to use "updateConfig()" after editing.
     AS5600Config& getConfig();

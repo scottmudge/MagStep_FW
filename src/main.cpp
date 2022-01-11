@@ -9,15 +9,21 @@
 ***************************************************/
 
 #include <Arduino.h>
-#include <ESP8266WiFi.h>
+#include <Wifi.h>
 #include <ESPArduinoPins.h>
+
 #include <MovingAverage.h>
 #include <float.h>
 MovingAverage<float> g_AngFlt(3);
 
-#include <AS5600.h>
-
+#include "AS5600.h"
+#include "Listener.h"
 #include "Encoder.h"
+
+static constexpr uint8_t StepPin_In = ESP32_D26;
+static constexpr uint8_t DirPin_In = ESP32_D27;
+static constexpr uint8_t StepPin_Out = ESP32_D14;
+static constexpr uint8_t DirPin_Out = ESP32_D12;
 
 AS5600 g_Magnet(ESP8266_D1, ESP8266_D2);
 EncoderMonitor g_Enc;
@@ -26,6 +32,7 @@ uint32_t g_Millis = millis();
 uint32_t g_Samp = 0U;
 float g_Buf = 0.0f;
 
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 bool is_equal(const float& left, const float& right, const float& epsilon /*= 0.001*/) {
     if (left == right)
         return true;
@@ -38,13 +45,19 @@ bool is_equal(const float& left, const float& right, const float& epsilon /*= 0.
     return diff / std::min<float>(float(fabsf(left) + fabsf(right)), FLT_MAX) < epsilon;
 }
 
+//==============================================================================
 void setup() {
+#ifdef DEBUG_OUTPUT
     Serial.begin(115200);
+#endif
+    delay(10);
     // put your setup code here, to run once:
     WiFi.mode(WIFI_OFF);
-    WiFi.forceSleepBegin();
+
+    Listener::attach(DirPin_In, StepPin_In, DirPin_Out, StepPin_Out);
 }
 
+//==============================================================================
 void loop() {
     int mag_str = g_Magnet.getMagnetStrength();
     uint16_t ang = 0;
@@ -55,7 +68,7 @@ void loop() {
         g_Enc.update(fl_ang);
         if (ang_buf != ang){
             ang_buf = ang;
-            Serial.printf("%.3f\n", g_Enc.getTotal());
+            Serial.printf("%s - %.3f\n", mag_str == 0 ? "None" : (mag_str == 1 ? "Weak" : mag_str == 2 ? "Good" : "Far"), g_Enc.getTotal());
         }
     }
 

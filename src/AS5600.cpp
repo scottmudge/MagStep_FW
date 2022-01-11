@@ -76,7 +76,7 @@ AS5600::AS5600(TwoWire *wire /*= nullptr*/) {
 // Constructor with arbitrary SDA and SCL pins
 //==============================================================================
 AS5600::AS5600(const uint8_t sda, const uint8_t scl){
-    _wire = new TwoWire();
+    _wire = new TwoWire(0);
     _wire->begin((int)sda, (int)scl);
     init();
 }
