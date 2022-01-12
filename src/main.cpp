@@ -7,6 +7,7 @@
    
   Description: Main file
 ***************************************************/
+#pragma GCC optimize ("O3")
 
 #include <Arduino.h>
 #include <Wifi.h>
@@ -20,12 +21,7 @@ MovingAverage<float> g_AngFlt(3);
 #include "Listener.h"
 #include "Encoder.h"
 
-static constexpr uint8_t StepPin_In = ESP32_D26;
-static constexpr uint8_t DirPin_In = ESP32_D27;
-static constexpr uint8_t StepPin_Out = ESP32_D14;
-static constexpr uint8_t DirPin_Out = ESP32_D12;
-
-AS5600 g_Magnet(ESP8266_D1, ESP8266_D2);
+// AS5600 g_Magnet(ESP8266_D1, ESP8266_D2);
 EncoderMonitor g_Enc;
 
 uint32_t g_Millis = millis();
@@ -52,25 +48,26 @@ void setup() {
 #endif
     delay(10);
     // put your setup code here, to run once:
-    WiFi.mode(WIFI_OFF);
+    //WiFi.mode(WIFI_OFF);
 
-    Listener::attach(DirPin_In, StepPin_In, DirPin_Out, StepPin_Out);
+    Listener::attach();
 }
 
 //==============================================================================
 void loop() {
-    int mag_str = g_Magnet.getMagnetStrength();
-    uint16_t ang = 0;
-    static uint16_t ang_buf = UINT16_MAX;
-    if (mag_str > 0){
-        ang = g_Magnet.getRawAngle(true);
-        const float fl_ang = g_Magnet.getRawAngleDegs();
-        g_Enc.update(fl_ang);
-        if (ang_buf != ang){
-            ang_buf = ang;
-            Serial.printf("%s - %.3f\n", mag_str == 0 ? "None" : (mag_str == 1 ? "Weak" : mag_str == 2 ? "Good" : "Far"), g_Enc.getTotal());
-        }
-    }
+    // int mag_str = g_Magnet.getMagnetStrength();
+    // uint16_t ang = 0;
+    // static uint16_t ang_buf = UINT16_MAX;
+    // if (mag_str > 0){
+    //     ang = g_Magnet.getRawAngle(true);
+    //     const float fl_ang = g_Magnet.getRawAngleDegs();
+    //     g_Enc.update(fl_ang);
+    //     if (ang_buf != ang){
+    //         ang_buf = ang;
+    //         Serial.printf("%s - %.3f\n", mag_str == 0 ? "None" : (mag_str == 1 ? "Weak" : mag_str == 2 ? "Good" : "Far"), g_Enc.getTotal());
+    //     }
+    // }
+    delay(1);
 
     // const float ang_f = ((float)ang / 4095.0f) * 360.0f;
     // g_AngFlt.push(ang_f);

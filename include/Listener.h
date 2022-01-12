@@ -14,8 +14,6 @@
 #include <Arduino.h>
 
 namespace Listener{
-    void attach(const uint8_t dir_pin, const uint8_t step_pin,
-    const uint8_t dir_pin_out, const uint8_t step_pin_out);
-    void detach();
+    void attach();
 }
 #endif  // __LISTENER_H__
