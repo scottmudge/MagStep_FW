@@ -40,6 +40,10 @@ static bool Attached = false;
 // ~5 nanoseconds per clock
 #define CLOCK_LEN_NS 5
 
+// Clock cycles
+#define STEP_PULSE_LEN 500
+#define STEP_PULSE_LEN_MAX 5000
+
 // Task/Thread Vars
 #define STACK_SIZE 8192
 TaskHandle_t ListenTask;
@@ -50,7 +54,13 @@ TaskHandle_t ListenTask;
 #define DIR_IN_PIN ESP32_D27
 #define DIR_OUT_PIN ESP32_D12
 
+#define STEP_IN_GPIO (gpio_num_t)STEP_IN_PIN
+
 #define USE_INTERRUPT_GUARD false
+
+// Queue stuff
+static xQueueHandle StepIn_Queue = NULL;
+static TaskHandle_t StepIn_Task = NULL;
 
 namespace Listener {
 
@@ -76,97 +86,75 @@ void IRAM_ATTR delayMicroseconds(uint32_t us) {
     }
 }
 
-void inline delayClocks(uint32_t clks) {
+void IRAM_ATTR inline delayClocks(uint32_t clks) {
     uint32_t c = clocks();
     while ((clocks() - c) < clks) {
         asm(" nop");
     }
 }
+
 //==============================================================================
+inline void IRAM_ATTR stepDir(const uint8_t dir, const uint32_t _clock_per = STEP_PULSE_LEN){
+    if (dir) GPIO_Set(DIR_OUT_PIN);
+    else GPIO_Clear(DIR_OUT_PIN);
 
-// ISR for dir pin
-//==============================================================================
-void IRAM_ATTR ListenerFunc(void* p) {
-    // Initial delay
-    vTaskDelay(1000);
-
-    // Data
-    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    // Efficient data containers, storing levels
-    register union {
-        uint32_t _d = 0;
-        struct {
-            uint8_t b0;
-            uint8_t b1;
-            uint8_t b2;
-            uint8_t b3;
-        };
-    } level;
-
-    // Extra data container
-    register union {
-        uint32_t _d = 0;
-        struct {
-            uint8_t b0;
-            uint8_t b1;
-            uint8_t b2;
-            uint8_t b3;
-        };
-    } data;
-
-    uint32_t c1 = clocks();
-    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-    // Main Loop
-    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    while (1) {  // the superloop
-
-#if (USE_INTERRUPT_GUARD == true)
-        portDISABLE_INTERRUPTS();
-#endif
-
-        // if (data.b0){
-        //     data.b0 = 0;
-        //     GPIO_Clear(STEP_OUT_PIN);
-        //     //digitalWrite(STEP_OUT_PIN, LOW);
-        // }
-
-        level.b0 = GPIO_IN_Read_Byte(STEP_IN_PIN);
-
-        if (level.b0 != level.b1) {  // only rising edges, adjust RTOS2 too !
-            if (level.b1 == 0) {
-                //if (level != old_level) {  // both edges
-
-                GPIO_Set(STEP_OUT_PIN);
-                delayClocks(20);
-                GPIO_Clear(STEP_OUT_PIN);
-                //delayClocks(50);
-                //vTaskDelay(500);
-                //GPIO_Clear(STEP_OUT_PIN);
-                //Irqs++;
-            }
-            level.b1 = level.b0;
-        }
-
-#if (USE_INTERRUPT_GUARD == true)
-        portENABLE_INTERRUPTS();
-#endif
-    }
-    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    GPIO_Set(STEP_OUT_PIN);
+    delayClocks(_clock_per);
+    GPIO_Clear(STEP_OUT_PIN);
 }
-//==============================================================================
 
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-void startListener(void) {
-    
-    xTaskCreatePinnedToCore(
-        ListenerFunc,
-        "Lst",
-        STACK_SIZE,
-        (void*)1,
-        tskIDLE_PRIORITY + 2,
-        &ListenTask,
-        1);
+inline void IRAM_ATTR stepOnce_Pos(){
+    GPIO_Set(DIR_OUT_PIN);
+    GPIO_Set(STEP_OUT_PIN);
+    delayClocks(STEP_PULSE_LEN);
+    GPIO_Clear(STEP_OUT_PIN);
+}
+
+inline void IRAM_ATTR stepOnce_Neg(){
+    GPIO_Clear(DIR_OUT_PIN);
+    GPIO_Set(STEP_OUT_PIN);
+    delayClocks(STEP_PULSE_LEN);
+    GPIO_Clear(STEP_OUT_PIN);
+}
+
+// QUEUE HANDLER
+//==============================================================================
+void IRAM_ATTR gpioQueueHandler(void* p){
+    uint8_t dir;
+    for(;;) {
+        if(xQueueReceive(StepIn_Queue, &dir, 1)) {
+            if (dir)
+                stepOnce_Pos();
+            else
+                stepOnce_Neg();
+        }
+    }
+}
+
+//==============================================================================
+volatile uint32_t last_clock = 0;
+volatile uint32_t last_time = STEP_PULSE_LEN;
+void IRAM_ATTR stepISR(void* p){
+    if (GPIO_IN_Read(STEP_IN_PIN)){
+        stepDir(GPIO_IN_Read(DIR_IN_PIN), last_time);
+        last_clock = clocks();
+    }
+    else
+        last_time =// min((max(((clocks() - last_clock) - CLOCK_OFFSET), (uint32_t)STEP_PULSE_LEN)), (uint32_t)STEP_PULSE_LEN_MAX);
+         min(((clocks() - last_clock) / 2U), (uint32_t)STEP_PULSE_LEN_MAX);
+}
+
+void setupInterrupt(){
+    StepIn_Queue = xQueueCreate(10, sizeof(uint8_t));
+    xTaskCreate(gpioQueueHandler, "stepqh", 4096, NULL, 10, &StepIn_Task);
+
+    gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
+    gpio_pad_select_gpio(STEP_IN_GPIO);
+    gpio_set_direction(STEP_IN_GPIO, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(STEP_IN_GPIO, GPIO_PULLDOWN_ONLY);
+    gpio_set_intr_type(STEP_IN_GPIO, GPIO_INTR_ANYEDGE);
+    gpio_isr_handler_add(STEP_IN_GPIO, stepISR, NULL);
+    gpio_intr_enable(STEP_IN_GPIO);
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -175,7 +163,9 @@ void attach() {
         //disableCore0WDT();
 
         // Use pulldown since we're using RISING
-        pinMode(STEP_IN_PIN, INPUT_PULLDOWN);
+        //pinMode(STEP_IN_PIN, INPUT_PULLDOWN);
+
+
         pinMode(STEP_OUT_PIN, OUTPUT);
 
         pinMode(DIR_IN_PIN, INPUT);
@@ -189,7 +179,9 @@ void attach() {
         else
             GPIO_Set(DIR_OUT_PIN);
 
-        startListener();
+        //startListener();
+
+        setupInterrupt();
 
         DbgLn("Core0 attached");
         Attached = true;

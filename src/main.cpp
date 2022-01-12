@@ -7,7 +7,7 @@
    
   Description: Main file
 ***************************************************/
-//#pragma GCC optimize("O3")
+#pragma GCC optimize("O3")
 
 #include <Arduino.h>
 #include <ESPArduinoPins.h>
@@ -72,7 +72,7 @@ void loop() {
 
     int mag_str = magnet->detectMagnet();
     if (mag_str < 0) {DbgLn("Err");}
-    else {DbgLn("%d", mag_str);}
+    // else {DbgLn("%d", mag_str);}
     // uint16_t ang = 0;
     // static uint16_t ang_buf = UINT16_MAX;
     // if (mag_str > 0) {
