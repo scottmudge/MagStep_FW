@@ -76,7 +76,7 @@ AS5600::AS5600(TwoWire *wire /*= nullptr*/) {
 // Constructor with arbitrary SDA and SCL pins
 //==============================================================================
 AS5600::AS5600(const uint8_t sda, const uint8_t scl){
-    _wire = new TwoWire(0);
+    _wire = new TwoWire(1);
     _wire->begin((int)sda, (int)scl);
     init();
 }
@@ -84,7 +84,7 @@ AS5600::AS5600(const uint8_t sda, const uint8_t scl){
 // Shared initialization code
 //==============================================================================
 void AS5600::init(){
-    _wire->setClock(100000U);
+   // _wire->setClock(100000U);
 }
 
 //==============================================================================
@@ -138,12 +138,6 @@ void AS5600::setWatchdogMode(AS5600_WatchdogMode_t wd_mode){
 void AS5600::setConfig(const AS5600Config& config) {
     _config = config;
     updateConfig();
-}
-
-// Returns I2C Address of Device
-//==============================================================================
-constexpr uint8_t AS5600::getAddress() {
-    return AS5600_I2C_Addr;
 }
 
 /* Sets a value in maximum angle register.
@@ -309,8 +303,9 @@ int AS5600::detectMagnet() {
     /* ML high = AGC Maximum overflow, magnet to weak*/
     /* MH high = AGC minimum overflow, Magnet to strong*/
     magStatus = readOneByte(AS5600_Reg_Status);
-
-    if (magStatus & 0x20)
+    if (magStatus == -1)
+        retVal = -1;
+    else if (magStatus & 0x20)
         retVal = 1;
 
     return retVal;
@@ -421,13 +416,13 @@ AS5600_Error_t AS5600::burnMaxAngleAndConfig() {
 //==============================================================================
 int AS5600::readOneByte(int in_adr) {
     int retVal = -1;
-    Wire.beginTransmission(getAddress());
-    Wire.write(in_adr);
-    Wire.endTransmission();
-    Wire.requestFrom(getAddress(), 1U);
-    while (Wire.available() == 0)
-        ;
-    retVal = Wire.read();
+    auto& w = *_wire;
+    w.beginTransmission(AS5600_I2C_Addr);
+    w.write(in_adr);
+    w.endTransmission();
+    w.requestFrom(AS5600_I2C_Addr, 1U);
+    if (w.available() != 0) 
+        retVal = w.read();
 
     return retVal;
 }
@@ -436,22 +431,24 @@ int AS5600::readOneByte(int in_adr) {
 //==============================================================================
 uint16_t AS5600::readTwoBytes(int in_adr_hi, int in_adr_lo) {
     /* Read 2 Bytes */
-    Wire.beginTransmission(getAddress());
-    Wire.write(in_adr_hi);
-    Wire.endTransmission();
-    Wire.requestFrom(getAddress(), 2U);
-    while (Wire.available() < 2) ;
-    int high = Wire.read();
-    int low = Wire.read();
+    auto& w = *_wire;
+    w.beginTransmission(AS5600_I2C_Addr);
+    w.write(in_adr_hi);
+    w.endTransmission();
+    w.requestFrom(AS5600_I2C_Addr, 2U);
+    while (w.available() < 2) ;
+    int high = w.read();
+    int low = w.read();
     return (high << 8) | low;
 }
 
 /* Writes one byte to a i2c register */
 //==============================================================================
 void AS5600::writeOneByte(int adr_in, int dat_in) {
-    Wire.beginTransmission(getAddress());
-    Wire.write(adr_in);
-    Wire.write(dat_in);
-    Wire.endTransmission();
+    auto& w = *_wire;
+    w.beginTransmission(AS5600_I2C_Addr);
+    w.write(adr_in);
+    w.write(dat_in);
+    w.endTransmission();
 }
 

@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <float.h>
 
 #ifdef DEBUG_OUTPUT
 #define Dbg(expr, ...) Serial.printf((const char*)(F(expr)), ## __VA_ARGS__)
@@ -19,3 +20,16 @@
 #define Warn(expr, ...) void()
 #define WarnLn(expr, ...) void()
 #endif
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+inline bool is_equal(const float& left, const float& right, const float& epsilon /*= 0.001*/) {
+    if (left == right)
+        return true;
+    const float diff = fabsf(left - right);
+    if (left == 0 || right == 0 || diff < FLT_MIN) {
+        // a or b is zero or both are extremely close to it
+        // relative error is less meaningful here
+        return diff < (epsilon * FLT_MIN);
+    }
+    return diff / std::min<float>(float(fabsf(left) + fabsf(right)), FLT_MAX) < epsilon;
+}

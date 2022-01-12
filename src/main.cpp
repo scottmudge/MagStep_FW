@@ -7,94 +7,87 @@
    
   Description: Main file
 ***************************************************/
-#pragma GCC optimize ("O3")
+//#pragma GCC optimize("O3")
 
 #include <Arduino.h>
-#include <Wifi.h>
 #include <ESPArduinoPins.h>
-
 #include <MovingAverage.h>
+#include <esp_task_wdt.h>
 #include <float.h>
+#include <Wire.h>
 MovingAverage<float> g_AngFlt(3);
 
-#include "AS5600.h"
-#include "Listener.h"
-#include "Encoder.h"
+#define DISABLE_WIFI_EXPLICIT false
 
-// AS5600 g_Magnet(ESP8266_D1, ESP8266_D2);
-EncoderMonitor g_Enc;
+#if (DISABLE_WIFI_EXPLICIT == true)
+#include <WiFi.h>
+#include <esp_bt.h>
+#include <esp_wifi.h>
+#endif
+
+#include "AS5600.h"
+#include "Encoder.h"
+#include "Listener.h"
+#include "Utility.h"
 
 uint32_t g_Millis = millis();
 uint32_t g_Samp = 0U;
 float g_Buf = 0.0f;
-
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-bool is_equal(const float& left, const float& right, const float& epsilon /*= 0.001*/) {
-    if (left == right)
-        return true;
-    const float diff = fabsf(left - right);
-    if (left == 0 || right == 0 || diff < FLT_MIN) {
-        // a or b is zero or both are extremely close to it
-        // relative error is less meaningful here
-        return diff < (epsilon * FLT_MIN);
-    }
-    return diff / std::min<float>(float(fabsf(left) + fabsf(right)), FLT_MAX) < epsilon;
-}
+AS5600* magnet = nullptr;
+EncoderMonitor encoder;
+TwoWire wire = TwoWire(1);
 
 //==============================================================================
 void setup() {
 #ifdef DEBUG_OUTPUT
     Serial.begin(115200);
 #endif
-    delay(10);
-    // put your setup code here, to run once:
-    //WiFi.mode(WIFI_OFF);
+    delay(5);
 
+#if (DISABLE_WIFI_EXPLICIT == true)
+    //WiFi.mode(WIFI_OFF);
+    esp_wifi_set_mode(WIFI_MODE_NULL);
+    esp_wifi_deinit();
+    esp_bt_controller_disable();
+    esp_bt_controller_deinit();
+#endif
+    wire.begin(ESP32_D5, ESP32_D4, 500000);
+    magnet = new AS5600(&wire);
+    delay(20);
     Listener::attach();
+
+    // put your setup code here, to run once:
 }
 
 //==============================================================================
 void loop() {
-    // int mag_str = g_Magnet.getMagnetStrength();
+    static uint32_t cur_mils = millis();
+    const uint32_t new_mils = millis();
+    const uint32_t elapsed_ms = (new_mils - cur_mils);
+
+    if (elapsed_ms > 500){
+        DbgLn("Cycle");
+        cur_mils = new_mils;
+    }
+
+    int mag_str = magnet->detectMagnet();
+    if (mag_str < 0) {DbgLn("Err");}
+    else {DbgLn("%d", mag_str);}
     // uint16_t ang = 0;
     // static uint16_t ang_buf = UINT16_MAX;
-    // if (mag_str > 0){
-    //     ang = g_Magnet.getRawAngle(true);
-    //     const float fl_ang = g_Magnet.getRawAngleDegs();
-    //     g_Enc.update(fl_ang);
-    //     if (ang_buf != ang){
+    // if (mag_str > 0) {
+    //     ang = magnet->getRawAngle(true);
+    //     const float fl_ang = magnet->getRawAngleDegs();
+    //     encoder.update(fl_ang);
+
+    //     const uint16_t dif = (uint16_t)(fabsf((float)ang_buf - (float)ang));
+    //     if (dif > 10) {
     //         ang_buf = ang;
-    //         Serial.printf("%s - %.3f\n", mag_str == 0 ? "None" : (mag_str == 1 ? "Weak" : mag_str == 2 ? "Good" : "Far"), g_Enc.getTotal());
+    //         Serial.printf("%s - %.3f\n", mag_str == 0 ? "None" : (mag_str == 1 ? "Weak" : mag_str == 2 ? "Good"
+    //                                                                                                    : "Far"),
+    //                       encoder.getTotal());
     //     }
     // }
     delay(1);
-
-    // const float ang_f = ((float)ang / 4095.0f) * 360.0f;
-    // g_AngFlt.push(ang_f);
-    // ++g_Samp;
-
-    // const uint32_t new_mils = millis();
-    // const uint32_t elapsed = new_mils - g_Millis;
-    // const uint32_t output_ms = 10;
-
-    // if (elapsed > output_ms) {
-    //     g_Millis = new_mils;
-    //     if (mag_str > 0) {
-    //         const float new_ang = g_AngFlt.get();
-    //         if (!is_equal(new_ang, g_Buf, 0.001)) {
-    //             g_Buf = new_ang;
-    //             Serial.printf("%.2f - %u/s\n", g_Buf, (g_Samp * 1000 / output_ms));
-    //         }
-    //     }
-    //     g_Samp = 0;
-    // }
-
-    // if (mag_str > 0){
-    //     sprintf(buf, "%s - %u\n", mag_str == 1 ? "Weak" : mag_str == 2 ? "Good" : "Far", ang);
-    //     Serial.printf(buf);
-    // }
-    // else {
-    //     Serial.printf("No\n");
-    //     delay(10);
-    // }
+    //vTaskDelete(NULL);
 }

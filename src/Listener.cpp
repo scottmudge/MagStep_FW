@@ -41,8 +41,8 @@ static bool Attached = false;
 #define CLOCK_LEN_NS 5
 
 // Task/Thread Vars
-#define STACK_SIZE 4096
-TaskHandle_t TaskA;
+#define STACK_SIZE 8192
+TaskHandle_t ListenTask;
 
 // Pin definitions
 #define STEP_IN_PIN ESP32_D26
@@ -86,7 +86,7 @@ void inline delayClocks(uint32_t clks) {
 
 // ISR for dir pin
 //==============================================================================
-void IRAM_ATTR Core1(void* p) {
+void IRAM_ATTR ListenerFunc(void* p) {
     // Initial delay
     vTaskDelay(1000);
 
@@ -157,20 +157,23 @@ void IRAM_ATTR Core1(void* p) {
 //==============================================================================
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-void startCore1(void) {
+void startListener(void) {
+    
     xTaskCreatePinnedToCore(
-        Core1,
-        "Core1",
+        ListenerFunc,
+        "Lst",
         STACK_SIZE,
         (void*)1,
         tskIDLE_PRIORITY + 2,
-        &TaskA,
+        &ListenTask,
         1);
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 void attach() {
     if (!Attached) {
+        //disableCore0WDT();
+
         // Use pulldown since we're using RISING
         pinMode(STEP_IN_PIN, INPUT_PULLDOWN);
         pinMode(STEP_OUT_PIN, OUTPUT);
@@ -186,9 +189,9 @@ void attach() {
         else
             GPIO_Set(DIR_OUT_PIN);
 
-        startCore1();
+        startListener();
 
-        DbgLn("Core1 attached");
+        DbgLn("Core0 attached");
         Attached = true;
     }
 }
