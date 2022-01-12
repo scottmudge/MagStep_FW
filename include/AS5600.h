@@ -124,7 +124,9 @@ enum AS5600_Error_t {
     AS5600_Error_General,
     AS5600_Error_NoBurnLeft,
     AS5600_Error_NoMagnet,
-    AS5600_Error_InvalidDistance
+    AS5600_Error_InvalidDistance,
+    AS5600_Error_I2C_Read,
+    AS5600_Error_I2C_Write
 } ;
 
 // Constants
@@ -217,6 +219,8 @@ public:
     AS5600_Error_t burnAngle();
     AS5600_Error_t burnMaxAngleAndConfig();
 
+    AS5600_Error_t getError(const bool reset = true);
+
 private:
     TwoWire* _wire;
 
@@ -227,6 +231,7 @@ private:
     uint16_t _maxAngle;
 
     AS5600Config _config;
+    AS5600_Error_t _err = AS5600_OK;
 
     uint16_t 
         _curRawAngle = 0U,

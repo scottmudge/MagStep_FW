@@ -136,7 +136,8 @@ volatile uint32_t last_clock = 0;
 volatile uint32_t last_time = STEP_PULSE_LEN;
 void IRAM_ATTR stepISR(void* p){
     if (GPIO_IN_Read(STEP_IN_PIN)){
-        stepDir(GPIO_IN_Read(DIR_IN_PIN), last_time);
+        const uint8_t dir = (uint8_t)GPIO_IN_Read_Byte(DIR_IN_PIN);
+        stepDir(dir, last_time);
         last_clock = clocks();
     }
     else
@@ -145,8 +146,8 @@ void IRAM_ATTR stepISR(void* p){
 }
 
 void setupInterrupt(){
-    StepIn_Queue = xQueueCreate(10, sizeof(uint8_t));
-    xTaskCreate(gpioQueueHandler, "stepqh", 4096, NULL, 10, &StepIn_Task);
+    //StepIn_Queue = xQueueCreate(10, sizeof(uint8_t));
+    //xTaskCreate(gpioQueueHandler, "stepqh", 4096, NULL, 10, &StepIn_Task);
 
     gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
     gpio_pad_select_gpio(STEP_IN_GPIO);

@@ -12,9 +12,9 @@
 #include <Arduino.h>
 #include <ESPArduinoPins.h>
 #include <MovingAverage.h>
+#include <Wire.h>
 #include <esp_task_wdt.h>
 #include <float.h>
-#include <Wire.h>
 MovingAverage<float> g_AngFlt(3);
 
 #define DISABLE_WIFI_EXPLICIT false
@@ -65,29 +65,24 @@ void loop() {
     const uint32_t new_mils = millis();
     const uint32_t elapsed_ms = (new_mils - cur_mils);
 
-    if (elapsed_ms > 500){
-        DbgLn("Cycle");
-        cur_mils = new_mils;
+    int mag_str = magnet->getMagnetStrength();
+    if (mag_str < 0) {
+        DbgLn("Err");
     }
+    uint16_t ang = 0;
+    if (mag_str > 0) {
+        ang = magnet->getRawAngle(true);
+        if (magnet->getError() == AS5600_OK) {
+            const float fl_ang = magnet->getRawAngleDegs();
+            encoder.update(fl_ang);
 
-    int mag_str = magnet->detectMagnet();
-    if (mag_str < 0) {DbgLn("Err");}
-    // else {DbgLn("%d", mag_str);}
-    // uint16_t ang = 0;
-    // static uint16_t ang_buf = UINT16_MAX;
-    // if (mag_str > 0) {
-    //     ang = magnet->getRawAngle(true);
-    //     const float fl_ang = magnet->getRawAngleDegs();
-    //     encoder.update(fl_ang);
-
-    //     const uint16_t dif = (uint16_t)(fabsf((float)ang_buf - (float)ang));
-    //     if (dif > 10) {
-    //         ang_buf = ang;
-    //         Serial.printf("%s - %.3f\n", mag_str == 0 ? "None" : (mag_str == 1 ? "Weak" : mag_str == 2 ? "Good"
-    //                                                                                                    : "Far"),
-    //                       encoder.getTotal());
-    //     }
-    // }
+            if (elapsed_ms > 500) {
+                cur_mils = new_mils;
+                Serial.printf("%s - %.3f\n", mag_str == 0 ? "None" : (mag_str == 1 ? "Weak" : mag_str == 2 ? "Good"
+                                                                                                           : "Far"),
+                              encoder.getTotal());
+            }
+        }
+    }
     delay(1);
-    //vTaskDelete(NULL);
 }

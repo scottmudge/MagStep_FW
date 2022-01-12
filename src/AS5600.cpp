@@ -303,11 +303,11 @@ int AS5600::detectMagnet() {
     /* ML high = AGC Maximum overflow, magnet to weak*/
     /* MH high = AGC minimum overflow, Magnet to strong*/
     magStatus = readOneByte(AS5600_Reg_Status);
-    if (magStatus == -1)
-        retVal = -1;
-    else if (magStatus & 0x20)
-        retVal = 1;
+    if (getError() != AS5600_OK) return -1;
 
+    if (magStatus & 0x20)
+        retVal = 1;
+        
     return retVal;
 }
 
@@ -325,7 +325,9 @@ int AS5600::getMagnetStrength() {
     /* ML high = AGC Maximum overflow, magnet to weak*/
     /* MH high = AGC minimum overflow, Magnet to strong*/
     magStatus = readOneByte(AS5600_Reg_Status);
-    if (detectMagnet() == 1)
+    if (getError() != AS5600_OK) return -1;
+    
+    if (magStatus & 0x20)
     {
         retVal = 2; /*just right */
         if (magStatus & 0x10)
@@ -412,6 +414,16 @@ AS5600_Error_t AS5600::burnMaxAngleAndConfig() {
     return retVal;
 }
 
+//==============================================================================
+AS5600_Error_t AS5600::getError(const bool reset) {
+    if (reset){
+        AS5600_Error_t ret = _err;
+        _err = AS5600_OK;
+        return ret;
+    }
+    return _err;
+}
+
 /* Reads one byte register from i2c */
 //==============================================================================
 int AS5600::readOneByte(int in_adr) {
@@ -421,9 +433,8 @@ int AS5600::readOneByte(int in_adr) {
     w.write(in_adr);
     w.endTransmission();
     w.requestFrom(AS5600_I2C_Addr, 1U);
-    if (w.available() != 0) 
-        retVal = w.read();
-
+    retVal = w.read();
+    if (retVal < 0) _err = AS5600_Error_I2C_Read;
     return retVal;
 }
 
@@ -436,10 +447,11 @@ uint16_t AS5600::readTwoBytes(int in_adr_hi, int in_adr_lo) {
     w.write(in_adr_hi);
     w.endTransmission();
     w.requestFrom(AS5600_I2C_Addr, 2U);
-    while (w.available() < 2) ;
     int high = w.read();
     int low = w.read();
-    return (high << 8) | low;
+    if (high < 0 || low < 0 || high > UINT8_MAX || low > UINT8_MAX)  
+        _err = AS5600_Error_I2C_Read;
+    return (uint16_t)((high << 8) | low);
 }
 
 /* Writes one byte to a i2c register */
