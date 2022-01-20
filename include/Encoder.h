@@ -19,33 +19,45 @@
     This monitors an encoder which goes from 0 - 360.0 degrees, and then 
     ensures that the total angle is tracked and maintained.
 */
-class EncoderMonitor{
-public:
-    EncoderMonitor();
-    ~EncoderMonitor();
+namespace EncoderMonitor{
+    void IRAM_ATTR update(float angle);
 
-    // Update the current angle
-    void update(float angle);
+    float IRAM_ATTR getTotal();
+    float IRAM_ATTR getLastAngle();
+    int32_t IRAM_ATTR getTotalRevs();
 
-    // Get total angle
-    float getTotal() const;
+    void IRAM_ATTR startEncoderTask();
+}
 
-    int32_t getTotalRevs() const;
+// class EncoderMonitor{
+// public:
+//     IRAM_ATTR EncoderMonitor();
+//     IRAM_ATTR ~EncoderMonitor();
 
-private:
-    bool m_Initialized = false;
+//     // Update the current angle
+//     void IRAM_ATTR update(float angle);
 
-    float 
-        m_Dir           = 0.0f,
-        m_TotalAngle    = 0.0f,
-        m_LastAngle     = 0.0f;
+//     // Get total angle
+//     float IRAM_ATTR getTotal() const;
+//     float IRAM_ATTR getLastAngle() const;
 
-    int32_t m_Revs = 0U;
+//     int32_t IRAM_ATTR getTotalRevs() const;
 
-    static constexpr uint8_t m_FltSize = 
-        (FILTER_FRAME_SIZE > 1 ? ((FILTER_FRAME_SIZE < UINT8_MAX) ? (uint8_t)FILTER_FRAME_SIZE : 255U) : 0U);
+// private:
+//     bool m_Initialized = false;
 
-    MovingAverage<float> m_MovAvg;
-};
+//     float 
+//         m_StartAng      = 0.0f,
+//         m_Dir           = 0.0f,
+//         m_TotalAngle    = 0.0f,
+//         m_LastAngle     = 0.0f;
+
+//     int32_t m_Revs = 0U;
+
+//     static constexpr uint8_t m_FltSize = 
+//         (FILTER_FRAME_SIZE > 1 ? ((FILTER_FRAME_SIZE < UINT8_MAX) ? (uint8_t)FILTER_FRAME_SIZE : 255U) : 0U);
+
+//     //MovingAverage<float> m_MovAvg;
+// };
 
 #endif // __ENCODER_H__

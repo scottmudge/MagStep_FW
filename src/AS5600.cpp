@@ -69,7 +69,7 @@ uint8_t AS5600Config::getHighByte(){
 // Constructor class for AS5600, supplying arbitrary I2C Wire
 //==============================================================================
 AS5600::AS5600(TwoWire *wire /*= nullptr*/) {
-    _wire = wire;
+    _wire = (wire != nullptr) ? wire : &Wire;
     init();
 }
 
@@ -78,6 +78,13 @@ AS5600::AS5600(TwoWire *wire /*= nullptr*/) {
 AS5600::AS5600(const uint8_t sda, const uint8_t scl){
     _wire = new TwoWire(1);
     _wire->begin((int)sda, (int)scl);
+    init();
+}
+
+// Set the wire
+//==============================================================================
+void AS5600::setWire(TwoWire* wire){
+    _wire = wire;
     init();
 }
 
@@ -430,12 +437,18 @@ int AS5600::readOneByte(int in_adr) {
     int retVal = -1;
     auto& w = *_wire;
     w.beginTransmission(AS5600_I2C_Addr);
-    w.write(in_adr);
-    w.endTransmission();
-    w.requestFrom(AS5600_I2C_Addr, 1U);
-    retVal = w.read();
-    if (retVal < 0) _err = AS5600_Error_I2C_Read;
-    return retVal;
+    if (w.write(in_adr) == 0) {
+        _err = AS5600_Error_I2C_Write;
+        w.endTransmission();
+        return INT_MAX;
+    }
+    else{
+        w.endTransmission();
+        w.requestFrom(AS5600_I2C_Addr, 1U);
+        retVal = w.read();
+        if (retVal < 0) _err = AS5600_Error_I2C_Read;
+        return retVal;
+    }
 }
 
 /* Reads two bytes register from i2c */
@@ -444,14 +457,20 @@ uint16_t AS5600::readTwoBytes(int in_adr_hi, int in_adr_lo) {
     /* Read 2 Bytes */
     auto& w = *_wire;
     w.beginTransmission(AS5600_I2C_Addr);
-    w.write(in_adr_hi);
-    w.endTransmission();
-    w.requestFrom(AS5600_I2C_Addr, 2U);
-    int high = w.read();
-    int low = w.read();
-    if (high < 0 || low < 0 || high > UINT8_MAX || low > UINT8_MAX)  
-        _err = AS5600_Error_I2C_Read;
-    return (uint16_t)((high << 8) | low);
+    if (w.write(in_adr_hi) == 0) {
+        _err = AS5600_Error_I2C_Write;
+        w.endTransmission();
+        return UINT16_MAX;
+    }
+    else {
+        w.endTransmission();
+        w.requestFrom(AS5600_I2C_Addr, 2U);
+        int high = w.read();
+        int low = w.read();
+        if (high < 0 || low < 0 || high > UINT8_MAX || low > UINT8_MAX)  
+            _err = AS5600_Error_I2C_Read;
+        return (uint16_t)((high << 8) | low);
+    }
 }
 
 /* Writes one byte to a i2c register */
@@ -459,8 +478,9 @@ uint16_t AS5600::readTwoBytes(int in_adr_hi, int in_adr_lo) {
 void AS5600::writeOneByte(int adr_in, int dat_in) {
     auto& w = *_wire;
     w.beginTransmission(AS5600_I2C_Addr);
-    w.write(adr_in);
-    w.write(dat_in);
+    if (w.write(adr_in) == 0) _err = AS5600_Error_I2C_Write;
+    else
+        if (w.write(dat_in) == 0) _err = AS5600_Error_I2C_Write;
     w.endTransmission();
 }
 

@@ -15,5 +15,8 @@
 
 namespace Listener{
     void attach();
+    int32_t totalSteps();
+    void suspendSteps();
+    void resumeSteps();
 }
 #endif  // __LISTENER_H__
